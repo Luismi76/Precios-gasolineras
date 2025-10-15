@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: gasolineras
+      POSTGRES_USER: gas
+      POSTGRES_PASSWORD: gas
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/app/sql:/docker-entrypoint-initdb.d
+    ports: ["5432:5432"]
+
+  adminer:
+    image: adminer
+    ports: ["8080:8080"]
+    depends_on: [postgres]
+
+  backend:
+    image: python:3.11-slim
+    working_dir: /app
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - ENERGIA_BASE=${ENERGIA_BASE}
+    volumes:
+      - ./backend:/app
+      - ./.env:/app/.env
+    ports: ["8010:8000"]
+    depends_on: [postgres]
+    command: bash -lc "pip install --no-cache-dir fastapi uvicorn[standard] pydantic pydantic-settings sqlalchemy psycopg[binary] requests python-dotenv && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    environment:
+      - VITE_API_BASE=http://192.168.1.251:8010
+    volumes:
+      - ./frontend:/app
+    ports: ["5173:5173"]
+    command: sh -lc "npm i && npm run dev -- --host"
+    depends_on: [backend]
+
+volumes:
+  pgdata:
