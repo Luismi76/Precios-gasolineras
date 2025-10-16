@@ -1,17 +1,13 @@
+# Entornos y dependencias
+.venv/
 __pycache__/
 *.pyc
-.venv/
-.env
-.env.*.local
-dist/
-build/
+*.pyo
 *.egg-info/
-.vscode/
-.idea/
-data/
-*.csv
-*.parquet
+node_modules/
+
+# Datos y salidas
+data/raw/
 *.log
-*.pbix
-.DS_Store
-Thumbs.db
+*.sqlite
+.env

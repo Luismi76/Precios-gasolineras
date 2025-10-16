@@ -1,0 +1,24 @@
+# Python / entorno
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Datos y backups
+data/raw/
+*.log
+*.sqlite
+.env
+backup_*/
+backup_*.tar.gz
+
+# VCS
+.git
+.gitignore

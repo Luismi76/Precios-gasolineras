@@ -1,12 +1,203 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PrecioGasolineras</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Precios de Gasolineras</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+  :root { --bg:#f7f7fb; --card:#fff; --bd:#e5e7eb; --pri:#1d4ed8; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);font:14px/1.4 system-ui,Arial}
+  header{padding:16px 20px;background:#111827;color:#fff}
+  header h1{margin:0;font-size:18px}
+  .wrap{padding:16px;display:grid;gap:16px;grid-template-columns: 360px 1fr}
+  @media (max-width: 1100px){ .wrap{grid-template-columns: 1fr} }
+  .card{background:var(--card);border:1px solid var(--bd);border-radius:12px}
+  .pad{padding:14px}
+  form label{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  input,select,button{padding:8px 10px;border:1px solid var(--bd);border-radius:8px}
+  button{background:var(--pri);color:#fff;border:none;cursor:pointer}
+  button:disabled{opacity:.6;cursor:default}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #map{height:460px;border-radius:12px;border:1px solid var(--bd)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px;border-bottom:1px solid var(--bd);vertical-align:top}
+  th{background:#eef2ff;text-align:left}
+  .toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px}
+  .muted{color:#6b7280}
+</style>
+</head>
+<body>
+<header><h1>Precios de Gasolineras — Snapshot del día</h1></header>
+
+<div class="wrap">
+  <!-- Panel filtros -->
+  <aside class="card pad">
+    <form id="f">
+      <div class="row">
+        <label>Carburante
+          <input name="fuel_type" placeholder="G95 / GOA / GLP"/>
+        </label>
+        <label>Provincia
+          <input name="provincia" placeholder="Sevilla"/>
+        </label>
+      </div>
+      <div class="row">
+        <label>Orden
+          <select name="orden">
+            <option value="precio" selected>Por precio</option>
+            <option value="rotulo">Por rótulo</option>
+          </select>
+        </label>
+        <label>Límite
+          <input type="number" name="limit" value="50" min="1" max="200"/>
+        </label>
+      </div>
+      <div class="toolbar">
+        <div>
+          <button id="buscar">Buscar</button>
+          <button id="limpiar" type="button" style="background:#6b7280">Limpiar</button>
+        </div>
+        <span class="muted" id="count"></span>
+      </div>
+    </form>
+    <div class="toolbar">
+      <div>
+        <button id="prev">&laquo; Anterior</button>
+        <button id="next">Siguiente &raquo;</button>
+      </div>
+      <span class="muted" id="pageinfo"></span>
+    </div>
+  </aside>
+
+  <!-- Mapa + tabla -->
+  <main class="card pad">
+    <div id="map"></div>
+    <div style="margin-top:12px;overflow:auto;max-height:360px" class="card pad">
+      <table id="tbl">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const API_BASE = "http://192.168.1.251:8000/api/search";
+
+let state = { limit: 50, offset: 0, lastCount: 0, params: {} };
+let map, markers;
+
+function initMap(){
+  map = L.map('map');
+  const tiles = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; OpenStreetMap' }
+  ).addTo(map);
+  markers = L.layerGroup().addTo(map);
+  map.setView([40.0, -3.7], 5); // España
+}
+
+function buildURL(params){
+  const u = new URL(API_BASE);
+  Object.entries(params).forEach(([k,v]) => {
+    if (v!=="" && v!=null) u.searchParams.set(k, v);
+  });
+  u.searchParams.set("limit", state.limit);
+  u.searchParams.set("offset", state.offset);
+  return u.toString();
+}
+
+function renderTable(items){
+  const th = document.querySelector("#tbl thead");
+  const tb = document.querySelector("#tbl tbody");
+  th.innerHTML = tb.innerHTML = "";
+  if(!items.length){
+    th.innerHTML = "<tr><th>(sin datos)</th></tr>";
+    return;
+  }
+  const cols = ["rotulo","price","fuel_type","provincia","localidad","direccion","ideess","date"];
+  th.innerHTML = "<tr>"+cols.map(c=>`<th>${c}</th>`).join("")+"</tr>";
+  tb.innerHTML = items.map(r => (
+    "<tr>"+cols.map(c=>`<td>${r[c] ?? ""}</td>`).join("")+"</tr>"
+  )).join("");
+}
+
+function renderMap(items){
+  markers.clearLayers();
+  const pts = [];
+  items.forEach(r=>{
+    const lat = Number(r.lat), lon = Number(r.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)){
+      const m = L.marker([lat, lon]).bindPopup(
+        `<b>${r.rotulo ?? "(sin rótulo)"}</b><br/>
+         ${r.direccion ?? ""}<br/>
+         ${r.localidad ?? ""} (${r.provincia ?? ""})<br/>
+         <b>${r.fuel_type ?? ""}: ${r.price ?? ""}</b>`
+      );
+      markers.addLayer(m);
+      pts.push([lat,lon]);
+    }
+  });
+  if (pts.length){
+    const b = L.latLngBounds(pts);
+    map.fitBounds(b.pad(0.15));
+  }
+}
+
+async function fetchPage(){
+  const url = buildURL(state.params);
+  document.getElementById("count").textContent = "Cargando…";
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const data = await res.json(); // {items, count}
+    state.lastCount = data.count || (data.items ? data.items.length : 0);
+    document.getElementById("count").textContent = `${state.lastCount} resultados`;
+    document.getElementById("pageinfo").textContent = `offset=${state.offset} · limit=${state.limit}`;
+    renderTable(data.items || []);
+    renderMap(data.items || []);
+    // deshabilitar prev si offset==0 y next si devolvió menos que limit
+    document.getElementById("prev").disabled = state.offset<=0;
+    document.getElementById("next").disabled = (state.lastCount < state.limit);
+  }catch(e){
+    document.getElementById("count").textContent = "Error";
+    alert("Error al consultar API: " + e.message);
+  }
+}
+
+document.getElementById("f").addEventListener("submit", (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const params = Object.fromEntries(fd.entries());
+  state.params = params;
+  state.limit = Number(params.limit || 50);
+  state.offset = 0;
+  fetchPage();
+});
+
+document.getElementById("limpiar").onclick = ()=>{
+  const f = document.getElementById("f");
+  f.reset();
+  state.params = {};
+  state.offset = 0;
+  state.limit = 50;
+  fetchPage();
+};
+
+document.getElementById("prev").onclick = ()=>{
+  state.offset = Math.max(0, state.offset - state.limit);
+  fetchPage();
+};
+document.getElementById("next").onclick = ()=>{
+  state.offset = state.offset + state.limit;
+  fetchPage();
+};
+
+initMap();
+</script>
+</body>
 </html>

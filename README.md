@@ -1,19 +1,26 @@
-# PrecioGasolineras (MVP)
+# Precios-gasolineras — ETL + API de precios
 
-Monorepo mínimo para API + Web + Postgres.
+[![CI](https://img.shields.io/github/actions/workflow/status/Luismi76/Precios-gasolineras/ci.yml?label=CI)](../../actions)
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Style](https://img.shields.io/badge/style-black%2Bruff-black)
 
-## Puesta en marcha rápida
+API y pipeline para consultar precios de carburantes en estaciones de servicio en España, con
+almacenamiento en Postgres y despliegue vía Docker Compose.
 
-```bash
-cp .env.example .env
-docker compose up -d postgres adminer
-# espera 5-10s a que inicie y cree tablas
-docker compose up backend -d
-docker compose exec backend bash backend/scripts/run_etl.sh
-docker compose up frontend -d
-```
+## Requisitos
+- Docker + Docker Compose
+- (Opcional) Python 3.11 para desarrollo local
 
-- Adminer: http://localhost:8080
-- API: http://localhost:8000/health
-- Web: http://localhost:5173
-# Precios-gasolineras
+## Variables de entorno
+Crea tu `.env` a partir de `.env.example`. Variables principales:
+```env
+APP_PORT=8000
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=gasolineras
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+exit
