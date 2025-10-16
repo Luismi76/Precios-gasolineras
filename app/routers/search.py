@@ -1,6 +1,5 @@
-# ============== app/routers/search.py ==============
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import get_db
@@ -17,56 +16,29 @@ def search(
     db: Session = Depends(get_db),
 ):
     """
-    Busca estaciones con filtros opcionales.
-    Devuelve el snapshot del día actual.
+    Busca estaciones y su precio actual (fecha = hoy) filtrando por fuel_type/provincia.
     """
-    try:
-        query = """
-        SELECT DISTINCT
-            s.ideess,
-            s.rotulo,
-            s.direccion,
-            s.localidad,
-            s.provincia,
-            s.lat,
-            s.lon,
-            p.fuel_type,
-            p.price,
-            p.date
+    query = """
+        SELECT
+          s.ideess, s.rotulo, s.direccion, s.localidad, s.provincia,
+          p.fuel_type, p.price, p.date
         FROM stations s
         JOIN prices_daily p ON p.station_id = s.ideess
-        WHERE p.date = CURRENT_DATE
-        """
-        
-        params = {}
-        
-        if fuel_type:
-            query += " AND p.fuel_type = :fuel_type"
-            params["fuel_type"] = fuel_type.upper()
-        
-        if provincia:
-            query += " AND s.provincia ILIKE :provincia"
-            params["provincia"] = f"%{provincia}%"
-        
-        # Ordenamiento
-        if orden == "rotulo":
-            query += " ORDER BY s.rotulo ASC, p.price ASC NULLS LAST"
-        else:
-            query += " ORDER BY p.price ASC NULLS LAST, s.rotulo ASC"
-        
-        query += " LIMIT :limit OFFSET :offset"
-        params["limit"] = limit
-        params["offset"] = offset
-        
-        result = db.execute(text(query), params)
-        rows = result.mappings().all()
-        
-        return {
-            "items": [dict(row) for row in rows],
-            "count": len(rows),
-            "limit": limit,
-            "offset": offset
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        WHERE 1=1
+          AND p.date = CURRENT_DATE
+    """
+    params: dict[str, object] = {}
+    if fuel_type:
+        query += " AND p.fuel_type = :fuel_type"
+        params["fuel_type"] = fuel_type.upper()
+    if provincia:
+        query += " AND s.provincia ILIKE :provincia"
+        params["provincia"] = f"%{provincia}%"
+
+    order = "p.price ASC, s.rotulo ASC" if orden == "precio" else "s.rotulo ASC, p.price ASC"
+    query += f" ORDER BY {order} LIMIT :limit OFFSET :offset"
+    params["limit"] = limit
+    params["offset"] = offset
+
+    rows = db.execute(text(query), params).mappings().all()
+    return {"total": len(rows), "items": [dict(r) for r in rows]}

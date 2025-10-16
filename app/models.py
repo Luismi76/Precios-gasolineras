@@ -5,7 +5,7 @@ from app.db import Base
 
 class Station(Base):
     __tablename__ = "stations"
-    
+
     ideess: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     rotulo: Mapped[str | None] = mapped_column(String(120))
     direccion: Mapped[str | None] = mapped_column(String(240))
@@ -15,21 +15,21 @@ class Station(Base):
     cp: Mapped[str | None] = mapped_column(String(10))
     lat: Mapped[float | None] = mapped_column(Float)
     lon: Mapped[float | None] = mapped_column(Float)
-    
+
     prices: Mapped[list["PriceDaily"]] = relationship(back_populates="station", cascade="all, delete-orphan")
 
 class PriceDaily(Base):
     __tablename__ = "prices_daily"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    station_id: Mapped[int] = mapped_column(Integer, ForeignKey("stations.ideess", ondelete="CASCADE"))
+    station_id: Mapped[int] = mapped_column(Integer, ForeignKey("stations.ideess", ondelete="CASCADE"), index=True)
     date: Mapped[date] = mapped_column(Date, index=True)
-    fuel_type: Mapped[str] = mapped_column(String(50))
+    fuel_type: Mapped[str] = mapped_column(String(50), index=True)
     price: Mapped[float | None] = mapped_column(Numeric(10, 3))
-    retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
     station: Mapped[Station] = relationship(back_populates="prices")
-    
+
     __table_args__ = (
         UniqueConstraint("station_id", "date", "fuel_type", name="uq_price_snapshot"),
         Index("ix_price_fuel_date", "fuel_type", "date"),
