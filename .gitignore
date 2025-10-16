@@ -1,13 +1,45 @@
-# Entornos y dependencias
-.venv/
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-node_modules/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
 
-# Datos y salidas
-data/raw/
-*.log
-*.sqlite
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific
 .env
+*.log
+data/raw/*.json
+data/exports/*.csv
+data/exports/*.xlsx
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Docker
+docker-compose.override.yml
